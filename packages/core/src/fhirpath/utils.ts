@@ -1,6 +1,6 @@
 import { Period, Quantity } from '@medplum/fhirtypes';
 import { PropertyType } from '../types';
-import { TypedValue } from './atoms';
+import { Atom, TypedValue } from './atoms';
 
 /**
  * Returns a single element array with a typed boolean value.

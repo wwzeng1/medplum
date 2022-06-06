@@ -1,6 +1,6 @@
 import { readJson } from '@medplum/definitions';
 import { AuditEvent, Bundle, BundleEntry, Observation, Patient, SearchParameter } from '@medplum/fhirtypes';
-import { evalFhirPath, parseFhirPath } from './parse';
+import { evalFhirPath, parseFhirPath, setFhirPath } from './parse';
 import { toTypedValue } from './utils';
 
 describe('FHIRPath parser', () => {
@@ -412,5 +412,19 @@ describe('FHIRPath parser', () => {
     };
     const result = evalFhirPath("between(birthDate, now(), 'years')", [toTypedValue(patient)]);
     expect(result).toEqual([{ value: 20, unit: 'years' }]);
+  });
+
+  test('Set FHIRPath', () => {
+    const obj1 = {};
+    setFhirPath('name', obj1, 'foo');
+    expect(obj1).toEqual({ name: 'foo' });
+
+    const obj2 = { foo: {} };
+    setFhirPath('foo.name', obj2, 'bar');
+    expect(obj2).toEqual({ foo: { name: 'bar' } });
+
+    const obj3 = { foo: [1, 2, 3] };
+    setFhirPath('foo[1]', obj3, 'bar');
+    expect(obj3).toEqual({ foo: [1, 'bar', 3] });
   });
 });

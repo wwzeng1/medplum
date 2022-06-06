@@ -19,6 +19,7 @@ export interface TypedValue {
 
 export interface Atom {
   eval(context: TypedValue[]): TypedValue[];
+  setValue?(context: TypedValue[], value: any): void;
 }
 
 export class FhirPathAtom implements Atom {
@@ -31,6 +32,14 @@ export class FhirPathAtom implements Atom {
       } else {
         return this.child.eval(context);
       }
+    } catch (error) {
+      throw new Error(`FhirPathError on "${this.original}": ${error}`);
+    }
+  }
+
+  setValue(context: TypedValue[], value: any): void {
+    try {
+      trySetValue(this.child, context, value);
     } catch (error) {
       throw new Error(`FhirPathError on "${this.original}": ${error}`);
     }
@@ -86,6 +95,13 @@ export class SymbolAtom implements Atom {
     } else {
       return [toTypedValue(result)];
     }
+  }
+
+  setValue(context: TypedValue[], value: any): void {
+    if (context.length !== 1) {
+      throw new Error('setValue only allowed on single-element contexts');
+    }
+    context[0].value[this.name] = value;
   }
 }
 
@@ -209,6 +225,10 @@ export class DotAtom implements Atom {
   constructor(public readonly left: Atom, public readonly right: Atom) {}
   eval(context: TypedValue[]): TypedValue[] {
     return this.right.eval(this.left.eval(context));
+  }
+
+  setValue(context: TypedValue[], value: any): void {
+    trySetValue(this.right, this.left.eval(context), value);
   }
 }
 
@@ -353,18 +373,33 @@ export class FunctionAtom implements Atom {
 export class IndexerAtom implements Atom {
   constructor(public readonly left: Atom, public readonly expr: Atom) {}
   eval(context: TypedValue[]): TypedValue[] {
-    const evalResult = this.expr.eval(context);
-    if (evalResult.length !== 1) {
-      return [];
-    }
-    const index = evalResult[0].value;
-    if (typeof index !== 'number') {
-      throw new Error(`Invalid indexer expression: should return integer}`);
-    }
+    const index = this.#getIndex(context);
     const leftResult = this.left.eval(context);
     if (!(index in leftResult)) {
       return [];
     }
     return [leftResult[index]];
   }
+
+  setValue(context: TypedValue[], value: any): void {
+    const index = this.#getIndex(context);
+    const leftResult = this.left.eval(context);
+    leftResult[index] = value;
+  }
+
+  #getIndex(context: TypedValue[]): number {
+    const evalResult = this.expr.eval(context);
+    const index = evalResult?.[0]?.value;
+    if (typeof index !== 'number') {
+      throw new Error(`Invalid indexer expression: should return integer}`);
+    }
+    return index;
+  }
+}
+
+function trySetValue(atom: Atom, context: TypedValue[], value: any): void {
+  if (!atom.setValue) {
+    throw new Error(atom.constructor.name + '.setValue not implemented');
+  }
+  context.forEach((e) => (atom.setValue as (context: TypedValue[], value: any) => void)([e], value));
 }

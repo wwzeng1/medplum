@@ -22,6 +22,7 @@ import {
   NotEquivalentAtom,
   OrAtom,
   SymbolAtom,
+  TypedValue,
   UnaryOperatorAtom,
   UnionAtom,
   XorAtom,
@@ -341,6 +342,20 @@ export function parseFhirPath(input: string): FhirPathAtom {
  * @returns The result of the FHIRPath expression against the resource or object.
  */
 export function evalFhirPath(input: string, context: unknown): unknown[] {
+  return parseFhirPath(input)
+    .eval(buildTypedContext(context))
+    .map((e) => e.value);
+}
+
+export function setFhirPath(input: string, context: unknown, value: any): void {
+  const atom = parseFhirPath(input);
+  if (!atom.setValue) {
+    throw new Error(`Cannot set value on ${input}`);
+  }
+  atom.setValue(buildTypedContext(context), value);
+}
+
+function buildTypedContext(context: unknown): TypedValue[] {
   // eval requires a TypedValue array
   // As a convenience, we can accept array or non-array, and TypedValue or unknown value
   if (!Array.isArray(context)) {
@@ -353,7 +368,5 @@ export function evalFhirPath(input: string, context: unknown): unknown[] {
       array[i] = { type: PropertyType.BackboneElement, value: el };
     }
   }
-  return parseFhirPath(input)
-    .eval(array)
-    .map((e) => e.value);
+  return array;
 }
