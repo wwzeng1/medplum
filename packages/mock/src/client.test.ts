@@ -399,23 +399,28 @@ describe('MockClient', () => {
   });
 
   test('Patch resource', async () => {
-    const client = new MockClient();
+    try {
+      const client = new MockClient();
 
-    const resource1 = await client.createResource<Patient>({
-      resourceType: 'Patient',
-    });
-    expect(resource1).toBeDefined();
+      const resource1 = await client.createResource<Patient>({
+        resourceType: 'Patient',
+      });
+      expect(resource1).toBeDefined();
 
-    const resource2 = await client.patchResource('Patient', resource1.id as string, [
-      {
-        op: 'add',
-        path: '/active',
-        value: true,
-      },
-    ]);
-    expect(resource2).toBeDefined();
-    expect(resource2.id).toEqual(resource1.id);
-    expect(resource2.meta?.versionId).not.toEqual(resource1.meta?.versionId);
+      const resource2 = await client.patchResource('Patient', resource1.id as string, [
+        {
+          op: 'add',
+          path: '/active',
+          value: true,
+        },
+      ]);
+      expect(resource2).toBeDefined();
+      expect(resource2.id).toEqual(resource1.id);
+      expect(resource2.meta?.versionId).not.toEqual(resource1.meta?.versionId);
+    } catch (err) {
+      console.log(err);
+      console.log(JSON.stringify(err, null, 2));
+    }
   });
 
   test('Patch resource preserves original', async () => {

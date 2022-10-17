@@ -1,59 +1,80 @@
 import json from '@rollup/plugin-json';
-import resolve from '@rollup/plugin-node-resolve';
-import terser from '@rollup/plugin-terser';
-import typescript from '@rollup/plugin-typescript';
 import { mkdirSync, writeFileSync } from 'fs';
-
-const extensions = ['.ts'];
+import esbuild, { minify } from 'rollup-plugin-esbuild';
 
 const globals = {
   '@medplum/core': 'medplum.core',
   '@medplum/fhir-router': 'medplum.fhirRouter',
-  'rfc6902': 'rfc6902',
+  rfc6902: 'rfc6902',
 };
 
-export default {
-  input: 'src/index.ts',
-  output: [
-    {
-      file: 'dist/esm/index.mjs',
-      format: 'esm',
-      sourcemap: true,
-    },
-    {
-      file: 'dist/esm/index.min.mjs',
-      format: 'esm',
-      plugins: [terser()],
-      sourcemap: true,
-    },
-    {
-      file: 'dist/cjs/index.cjs',
-      format: 'umd',
-      name: 'medplum.mock',
-      sourcemap: true,
-      globals,
-    },
-    {
-      file: 'dist/cjs/index.min.cjs',
-      format: 'umd',
-      name: 'medplum.mock',
-      plugins: [terser()],
-      sourcemap: true,
-      globals,
-    },
-  ],
-  plugins: [
-    resolve({ extensions }),
-    typescript({ declaration: false }),
-    json(),
-    {
-      buildEnd: () => {
-        mkdirSync('./dist/cjs', { recursive: true });
-        mkdirSync('./dist/esm', { recursive: true });
-        writeFileSync('./dist/cjs/package.json', '{"type": "commonjs"}');
-        writeFileSync('./dist/esm/package.json', '{"type": "module"}');
+const sourcemapPathTransform = (path) => path.replaceAll('\\', '/').replaceAll('../../../src', '../../src');
+
+export default [
+  {
+    input: 'src/index.ts',
+    output: [
+      {
+        file: 'dist/cjs/index.cjs',
+        format: 'umd',
+        name: 'medplum.mock',
+        sourcemap: true,
+        sourcemapPathTransform,
+        globals,
       },
-    },
-  ],
-  external: Object.keys(globals),
-};
+      {
+        file: 'dist/cjs/index.min.cjs',
+        format: 'umd',
+        name: 'medplum.mock',
+        plugins: [minify()],
+        sourcemap: true,
+        sourcemapPathTransform,
+        globals,
+      },
+    ],
+    plugins: [
+      json(),
+      esbuild(),
+      {
+        buildEnd: () => {
+          mkdirSync('./dist/cjs', { recursive: true });
+          writeFileSync('./dist/cjs/package.json', '{"type": "commonjs"}');
+        },
+      },
+    ],
+    external: Object.keys(globals),
+  },
+  {
+    input: 'src/index.ts',
+    output: [
+      {
+        dir: 'dist/esm',
+        entryFileNames: '[name].mjs',
+        format: 'esm',
+        preserveModules: true,
+        preserveModulesRoot: 'src',
+        sourcemap: true,
+        sourcemapPathTransform,
+      },
+      {
+        file: 'dist/esm/index.min.mjs',
+        format: 'esm',
+        plugins: [minify()],
+        sourcemap: true,
+        sourcemapPathTransform,
+      },
+    ],
+    plugins: [
+      json(),
+      esbuild(),
+      {
+        buildEnd: () => {
+          mkdirSync('./dist/esm/node_modules/tslib', { recursive: true });
+          writeFileSync('./dist/esm/package.json', '{"type": "module"}');
+          writeFileSync('./dist/esm/node_modules/tslib/package.json', '{"type": "module"}');
+        },
+      },
+    ],
+    external: Object.keys(globals),
+  },
+];

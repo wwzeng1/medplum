@@ -13,6 +13,8 @@
   "scripts": {
     "clean": "rimraf dist",
     "build": "npm run clean && tsc --project tsconfig.build.json && rollup --config rollup.config.mjs",
+    "build:types": "tsc --project tsconfig.cjs.json && tsc --project tsconfig.esm.json",
+    "rollup": "rollup --config rollup.config.mjs",
     "test": "jest"
   },
   "dependencies": {

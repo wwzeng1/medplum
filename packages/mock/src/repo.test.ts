@@ -63,6 +63,13 @@ describe('Mock Repo', () => {
 
   test('Search by name', async () => {
     const client = new MockClient();
+    const result = await client.search('Patient', '_id=' + HomerSimpson.id);
+    expect(result).toBeDefined();
+    expect(result.entry?.length).toBe(1);
+  });
+
+  test('Search by name', async () => {
+    const client = new MockClient();
     const result = await client.search('Patient', 'name:contains=Simpson');
     expect(result).toBeDefined();
     expect(result.entry?.length).toBe(2);

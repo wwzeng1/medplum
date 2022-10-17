@@ -1,13 +1,8 @@
 import json from '@rollup/plugin-json';
-import resolve from '@rollup/plugin-node-resolve';
-import replace from '@rollup/plugin-replace';
-import terser from '@rollup/plugin-terser';
-import typescript from '@rollup/plugin-typescript';
 import { execSync } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
+import esbuild, { minify } from 'rollup-plugin-esbuild';
 import packageJson from './package.json' assert { type: 'json' };
-
-const extensions = ['.ts'];
 
 const globals = {
   pdfmake: 'pdfmake',
@@ -35,22 +30,20 @@ export default [
         file: 'dist/cjs/index.min.cjs',
         format: 'umd',
         name: 'medplum.core',
-        plugins: [terser({ sourceMap: true })],
+        plugins: [minify()],
+        sourcemap: true,
         sourcemapPathTransform,
         globals,
       },
     ],
     plugins: [
-      replace({
-        preventAssignment: true,
-        values: {
+      json(),
+      esbuild({
+        define: {
           'process.env.NODE_ENV': '"production"',
           'process.env.MEDPLUM_VERSION': `"${medplumVersion}"`,
         },
       }),
-      json(),
-      resolve({ extensions }),
-      typescript({ outDir: 'dist/cjs', declaration: false }),
       {
         buildEnd: () => {
           mkdirSync('./dist/cjs', { recursive: true });
@@ -75,21 +68,19 @@ export default [
       {
         file: 'dist/esm/index.min.mjs',
         format: 'esm',
-        plugins: [terser({ sourceMap: true })],
+        plugins: [minify()],
+        sourcemap: true,
         sourcemapPathTransform,
       },
     ],
     plugins: [
-      replace({
-        preventAssignment: true,
-        values: {
+      json(),
+      esbuild({
+        define: {
           'process.env.NODE_ENV': '"production"',
           'process.env.MEDPLUM_VERSION': `"${medplumVersion}"`,
         },
       }),
-      json(),
-      resolve({ extensions }),
-      typescript({ module: 'es6', outDir: 'dist/esm', declaration: false }),
       {
         buildEnd: () => {
           mkdirSync('./dist/esm/node_modules/tslib', { recursive: true });
