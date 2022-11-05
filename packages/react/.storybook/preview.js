@@ -20,6 +20,7 @@ const medplum = new MockClient();
 medplum.requestSchema('Patient');
 
 const theme = {
+  colorScheme: 'dark',
   headings: {
     sizes: {
       h1: {

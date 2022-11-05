@@ -33,6 +33,7 @@ const medplum = new MedplumClient({
 });
 
 const theme: MantineThemeOverride = {
+  colorScheme: 'dark',
   headings: {
     sizes: {
       h1: {
