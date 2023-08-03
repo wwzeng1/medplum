@@ -4,6 +4,12 @@ import { existsSync, readFileSync, writeFile } from 'fs';
 import { basename, extname, resolve } from 'path';
 import internal from 'stream';
 import tar from 'tar';
+import { FileSystemStorage } from './storage';
+import { SignJWT } from 'jose';
+import * as path from 'path';
+import fs from 'fs';
+import { createPrivateKey, randomBytes } from 'crypto';
+import { homedir } from 'os';
 
 interface MedplumConfig {
   readonly baseUrl?: string;
@@ -19,6 +25,19 @@ interface MedplumBotConfig {
   readonly id: string;
   readonly source: string;
   readonly dist?: string;
+}
+
+export interface Profile {
+  readonly name: string;
+  readonly baseUrl?: string;
+  readonly fhirUrlPath?: string;
+  readonly accessToken?: string;
+  readonly tokenUrl?: string;
+  readonly authorizeUrl?: string;
+  readonly clientId?: string;
+  readonly clientSecret?: string;
+  readonly privateKeyPath?: string;
+  readonly authType?: string;
 }
 
 export function prettyPrint(input: unknown): void {
@@ -191,4 +210,47 @@ export function getCodeContentType(filename: string): string {
     return ContentType.TYPESCRIPT;
   }
   return ContentType.TEXT;
+}
+
+export function createProfile(profileName: string, options: any): void {
+  const storage = new FileSystemStorage(profileName);
+  const optionsObject = { name: profileName, ...options };
+  storage.setObject('options', optionsObject);
+  console.log(`${profileName} profile created`);
+}
+
+export function getProfileOptions(profileName: string): Profile | undefined {
+  const storage = new FileSystemStorage(profileName);
+  return storage.getObject('options');
+}
+
+export async function jwtAssertionLogin(externalClient: MedplumClient, profile: Profile): Promise<string> {
+  const homeDir = homedir();
+  const privateKeyPath = path.join(homeDir, profile.privateKeyPath as string);
+  const privateKeyStr = fs.readFileSync(privateKeyPath);
+  const privateKey = createPrivateKey(privateKeyStr);
+  const audience = profile.baseUrl ?? '' + profile.tokenUrl ?? '';
+  const jwt = await new SignJWT({})
+    .setProtectedHeader({ alg: 'RS384', typ: 'JWT' })
+    .setIssuer(profile.clientId as string)
+    .setSubject(profile.clientId as string)
+    .setAudience(audience)
+    .setJti(randomBytes(16).toString('hex'))
+    .setExpirationTime('2h')
+    .sign(privateKey);
+
+  const res = await externalClient.post(
+    profile.tokenUrl as string,
+    {
+      grant_type: 'client_credentials',
+      client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion: jwt,
+    },
+    'application/x-www-form-urlencoded'
+  );
+
+  if (res.status !== 200) {
+    throw new Error(`Failed to login: ${res.status} ${res.statusText}`);
+  }
+  return res.access_token;
 }

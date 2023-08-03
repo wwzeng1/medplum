@@ -8,6 +8,7 @@ export function createMedplumCommand(name: string): Command {
     .option('--token-url <tokenUrl>', 'FHIR server token url')
     .option('--authorize-url <authorizeUrl>', 'FHIR server authorize url')
     .option('--fhir-url-path <fhirUrlPath>', 'FHIR server url path')
+    .option('--private-key-path <privateKeyPath>', 'Private key path for JWT assertion')
     .option('-p, --profile <profile>', 'Profile name')
     .addOption(
       new Option('--auth-type <authType>', 'Type of authentication').choices([
@@ -16,6 +17,7 @@ export function createMedplumCommand(name: string): Command {
         'authorization-code',
         'jwt-bearer',
         'token-exchange',
+        'jwt-assertion',
       ])
     );
 }

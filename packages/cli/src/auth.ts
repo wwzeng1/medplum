@@ -1,9 +1,11 @@
-import { ContentType, getDisplayString, MedplumClient, normalizeErrorString } from '@medplum/core';
+import { ContentType, MedplumClient, getDisplayString, normalizeErrorString } from '@medplum/core';
 import { exec } from 'child_process';
 import { createServer } from 'http';
 import { platform } from 'os';
 import { createMedplumClient } from './util/client';
 import { createMedplumCommand } from './util/command';
+import { Profile, createProfile, getProfileOptions, jwtAssertionLogin } from './utils';
+import { FileSystemStorage } from './storage';
 
 const clientId = 'medplum-cli';
 const redirectUri = 'http://localhost:9615';
@@ -12,12 +14,17 @@ export const login = createMedplumCommand('login');
 export const whoami = createMedplumCommand('whoami');
 
 login.action(async (options) => {
-  const medplum = await createMedplumClient(options);
+  if (!isThereExistingProfileName(options.profile)) {
+    console.log(`Creating new profile...`);
+    createProfile(options.profile, options);
+  }
   if (options.authType === 'basic') {
     console.log('Basic authentication does not require login');
     return;
   }
-  await startLogin(medplum);
+  const medplum = await createMedplumClient(options);
+  const profile = getProfileOptions(options.profile);
+  await startLogin(medplum, profile);
 });
 
 whoami.action(async (options) => {
@@ -25,15 +32,21 @@ whoami.action(async (options) => {
   printMe(medplum);
 });
 
-async function startLogin(medplum: MedplumClient): Promise<void> {
-  await startWebServer(medplum);
-  const loginUrl = new URL(medplum.getAuthorizeUrl());
-  loginUrl.searchParams.set('client_id', clientId);
-  loginUrl.searchParams.set('redirect_uri', redirectUri);
-  loginUrl.searchParams.set('scope', 'openid');
-  loginUrl.searchParams.set('response_type', 'code');
-  loginUrl.searchParams.set('prompt', 'login');
-  await openBrowser(loginUrl.toString());
+async function startLogin(medplum: MedplumClient, profile?: Profile): Promise<void> {
+  if (!profile?.authType) {
+    await medplumAuthorizationCodeLogin(medplum);
+    return;
+  }
+  if (profile.authType === 'jwt-assertion') {
+    const accessToken = await jwtAssertionLogin(medplum, profile);
+    const storage = new FileSystemStorage(profile.name ?? '');
+    storage.setObject('activeLogin', {
+      accessToken,
+    });
+    console.log(`Access token created`);
+  } else {
+    throw new Error('Unsupported auth type');
+  }
 }
 
 async function startWebServer(medplum: MedplumClient): Promise<void> {
@@ -96,4 +109,27 @@ function printMe(medplum: MedplumClient): void {
   } else {
     console.log('Not logged in');
   }
+}
+
+async function medplumAuthorizationCodeLogin(medplum: MedplumClient): Promise<void> {
+  await startWebServer(medplum);
+  const loginUrl = new URL(medplum.getAuthorizeUrl());
+  loginUrl.searchParams.set('client_id', clientId);
+  loginUrl.searchParams.set('redirect_uri', redirectUri);
+  loginUrl.searchParams.set('scope', 'openid');
+  loginUrl.searchParams.set('response_type', 'code');
+  loginUrl.searchParams.set('prompt', 'login');
+  await openBrowser(loginUrl.toString());
+}
+
+function isThereExistingProfileName(profileName?: string): boolean {
+  if (profileName) {
+    const storage = new FileSystemStorage(profileName);
+    const optionsObject = storage.getObject('options');
+    if (!optionsObject) {
+      return false;
+    }
+  }
+  // If there isn't a profileName, we'll return true for the 'default' profile
+  return true;
 }
