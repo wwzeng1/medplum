@@ -25,20 +25,20 @@ class MedplumStack {
     this.frontEnd = new FrontEnd(this.primaryStack, config, config.region);
     this.storage = new Storage(this.primaryStack, config, config.region);
 
-    if (config.region !== 'us-east-1') {
-      // Some resources must be created in us-east-1
+    if (config.region !== 'us-east-1' || config.region !== 'us-east-2') {
+      // Some resources must be created in us-east-1 or us-east-2
       // For example, CloudFront distributions and ACM certificates
-      // If the primary region is not us-east-1, create these resources in us-east-1
-      const usEast1Stack = new Stack(scope, config.stackName + '-us-east-1', {
+      // If the primary region is not us-east-1 or us-east-2, create these resources in the specified region
+      const usEastStack = new Stack(scope, config.stackName + '-' + config.region, {
         env: {
-          region: 'us-east-1',
+          region: config.region,
           account: config.accountNumber,
         },
       });
-      Tags.of(usEast1Stack).add('medplum:environment', config.name);
+      Tags.of(usEastStack).add('medplum:environment', config.name);
 
-      this.frontEnd = new FrontEnd(usEast1Stack, config, 'us-east-1');
-      this.storage = new Storage(usEast1Stack, config, 'us-east-1');
+      this.frontEnd = new FrontEnd(usEastStack, config, config.region);
+      this.storage = new Storage(usEastStack, config, config.region);
     }
   }
 }
